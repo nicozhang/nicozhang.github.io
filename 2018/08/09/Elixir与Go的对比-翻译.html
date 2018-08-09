@@ -1,0 +1,270 @@
+<h1 id="elixir-与-go-的对比-翻译">Elixir 与 Go 的对比 [翻译]</h1>
+
+<p>标签（空格分隔）： 翻译 Elixir Go</p>
+
+<p>阅读时间： 16 分钟</p>
+
+<blockquote>
+  <p>之前一直做 Python 和  Rails(暂时代替 Ruby) 的开发。 这两种语言都有自己的优势，应用都很广泛，但也不乏有缺陷，最突出的问题莫过于性能了。所以，在高并发到来之前，需要寻找高性能的语言来做替补，主要用来替代 Rails 的角色。Golang 是首先想到的，但在 Rails 社区 Elixir可以说高性能的代名词。在查找这两门语言对比的时候，发现了这篇文章。<a href="https://blog.codeship.com/comparing-elixir-go/">原文链接</a></p>
+</blockquote>
+
+<hr />
+
+<p>在过去的几年里, Elixir 和 Go 的流行度均有巨大的提高。这两种语言通常能满足开发人员寻找的高并发方案。它们遵循许多相似的原则，但两者都对一些特殊场景下的应用做了折中<sup id="fnref:tradeoff"><a href="#fn:tradeoff" class="footnote">1</a></sup>。</p>
+
+<p>下面通过它们的背景、编程风格及并发的处理对比这两门语言。</p>
+
+<h2 id="起源">起源</h2>
+
+<p>Go/Golang自2009年起由Google研发，以二进制文件( 编译后)的形式运行在部署的平台上。 最开始的时候，它被作为一种尝试去 创建一种新的编程语言， 以解决其他编程语言的主要弊端，并保持其优势。</p>
+
+<p>Go在实现开发速度、并发性、性能、稳定性、可移植性和可维护性的平衡方面做得非常出色。因此，Docker和InfluxDB都是用Go构建的，包括谷歌、Netflix、Uber、Dropbox、SendGrid和SoundCloud在内的许多大公司都在使用它来做分类工具。</p>
+
+<p>Elixir自2011年由Jose Valim在<a href="http://plataformatec.com.br/">Plataformatec</a>的时候开发的，运行在BEAM VM， 也就是 Erlang VM。</p>
+
+<p>Erlang自1986由爱立信开发，用于高可用分布式电话系统。它已经扩展到诸如网络服务器等许多其他领域，并已经实现了9个9的可用性（31毫秒/年的停机时间）。</p>
+
+<p>Elixir的设计目标是在保持与Erlang生态系统兼容性的同时，还能够在Erlang VM中实现更高的可扩展性和生产力。 它通过在Elixir代码中使用Erlang库来实现这个目标，反之亦然。</p>
+
+<blockquote>
+  <p>为了避免重复，我们将Elixir / Erlang / BEAM统称为“Elixir”。</p>
+</blockquote>
+
+<p><a href="https://github.com/doomspork/elixir-companies">许多公司</a>已经在生产环境中使用 Elixir, 这其中包括 Discord 、 Bleacher Report 、 Teachers Pay Teachers、 Puppet Labs 、Seneca Systems 和 FarmBot。 以及其他很多项目也是使用Erlang构建的，包括WhatsApp，Facebook的聊天服务，Amazon的CloudFront CDN，Incapsula，Heroku的路由和日志记录层，CouchDB，Riak，RabbitMQ以及全球约一半的电话系统。</p>
+
+<h3 id="编程风格">编程风格</h3>
+
+<p>理解每个运行时的核心原理，才能对 Elixir 和 Go 做可靠对比，因为这些构建块是语言的基础。</p>
+
+<p>Go是一种对传统C系编程背景的人来说更容易熟悉的语言,  尽管它做了一些有利于函数式编程的设计。Go的静态类型，指针和结构体，会让你有种似曾相识的感觉。</p>
+
+<p>函数可以附加到结构体类型，这种组合方式随着时间的推移更能促进项目的增长。函数可以在任何地方创建并附加到结构体，而不是将其嵌入到必须扩展的对象中。</p>
+
+<p>如果一个方法需要被多种类型的结构体调用时，可以为这个方法定义一个接口以便于提供更大的灵活性。典型的面向对象的编程语言必须首先定义一个对象来实现一个特定的接口， 与之不同的是Go中的接口将被自动应用于与之相匹配的任何事物。<a href="https://gobyexample.com/interfaces">Go的接口实例</a></p>
+
+<p>Elixir 更倾向于函数式风格， 但融合了一些面向对象语言的原理，使它的这种过渡不显得那么违和。</p>
+
+<p>变量是不可变的，由于使用消息传递，就不需要传递指针，这意味着函数调用是非常直接的。 传入参数，返回结果，没有其他影响。 这简化了一些例如测试和代码可读性方面的问题。</p>
+
+<p>由于数据不可变，诸如for循环之类的常见操作是不可用的，因为无法创建一个递增的计数器。尽管Enum(枚举)库以一种简单的方式提供了常见的迭代模式，但递归通常被用来代替这类操作。</p>
+
+<p>由于递归使用频繁，因此Elixir还专门做了尾部调用优化。如果函数的最后一次调用的是自己，则可以防止调用堆栈的增长，从而避免堆栈溢出错误。</p>
+
+<p>Elixir广泛的采用模式匹配，这与Go利用接口的方式非常相似。 使用Elixir，函数可以定义为：</p>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>def example_pattern(%{ "data" =&gt; %{ "nifty" =&gt; "bob", "other_thing" =&gt; other}}) do
+  IO.puts(other)
+end
+</code></pre></div></div>
+
+<p>使用 map 模式作为函数的参数，只有当传入的 map 包含键为 data, 值为嵌套的 map,  且值中又包含键为 nift 值为 bob 和 另外一个键为 other_thing的时候，改函数才会被调用。而此时，变量other才会被赋值。</p>
+
+<p>从函数参数到变量赋值，尤其是递归，都会用到模式匹配。这里有些<a href="https://quickleft.com/blog/pattern-matching-elixir/">例子</a>，可以感受一下。 结构可以被定义为类型，然后也可以在模式匹配中使用。</p>
+
+<p>从原理上讲，这两种方法是非常相似的。两者都将数据结构和数据操作分开。同时也都是通过匹配来定义函数的调用，Go 通过接口，而 Elixir 通过模式匹配。</p>
+
+<p>尽管 Go 允许函数通过特定的类型调用, g.area(), 但实际上这跟 area(g)是一样的。两者之间的唯一区别，在Elixir中 area()需要返回结果，而 Go 则是在内存里实现了一次引用。</p>
+
+<p>由于采用这种方法，这两种语言的组合性变得非常强，在项目的整个生命周期中，不用去控制、扩展、注入以及重建大的继承树。这对大项目来说是个重大的利好。</p>
+
+<p>此处最大的区别是，使用 Go 的时候，为了重用这种模式会在函数外定义，但如果组织不好，可能导致创建大量重复的接口。Elixir 不能简单的复用模式，但模式总是在使用它的地方定义。</p>
+
+<p>Elixir使用”strong” typing(强类型)而不是static typing(静态类型)， 而且大部分是推断出来的。在 Elixir 中， 没有符号重载，所以不能用<code class="highlighter-rouge">+</code>连接两个字符创会让你感觉很困惑。在 Elixir 中，<code class="highlighter-rouge">&lt;&gt;</code>可以用来连接字符串。</p>
+
+<p>如果不理解背后的原因，这会让你感觉憋得慌。编译器能够通过显式的运算符推断出加号两边必须都是数字。同样，<code class="highlighter-rouge">&lt;&gt;</code>任何一边都必须是字符串。</p>
+
+<p>强类型本质上是指动态类型, 其中编译器通过透析器(dialyzer)可以捕捉每种类型, 模式匹配中歧义参数除外(避免为<code class="highlighter-rouge">_</code> 指代的不会被用到的变量或参数分配内存，就像Go一样，只是用来占位) 。 代码注释可以用来定义这些异常情况下的类型。 这样做的好处是，你可以获得静态类型的大部分优势，又不会失去动态类型所带来的灵活性和元编程特权。</p>
+
+<p>Elixir的文件可以使用.ex作为编译代码的后缀，也可以用.exs 作为运行时编译的脚本后缀，例如 shell 脚本等。Go 总是被编译的， 然而 Go 的编译器是如此之快，以至于庞大的代码块也能在瞬间完成编译。</p>
+
+<h2 id="并发">并发</h2>
+<p>并发性是本次比较的关键。现在你已经对语言风格有了一个基本的了解，其余部分会更有意义。</p>
+
+<p>传统意义上，线程所涉及的并发是比较重量的。最近，一些编程语言开始使用”轻线程”或”绿线程”, 实际上它是在单个线程里使用一个调度器来管理不同逻辑的轮流执行。</p>
+
+<p>这类的并发模型是内存高效的，但依赖于运行时指定的执行流程。JavaScript 已经使用这种风格很多年了。举个简单的🌰， 当你听到JavaScript 的 “非阻塞I/O”时，意味着在线程中执行的代码需要执行 I/O操作的时候，会将控制权交还给调度器。</p>
+
+<h3 id="合作式调度对比抢占式调度">合作式调度对比抢占式调度</h3>
+
+<p>Elixir和Go都使用了调度器来实现它们的并发模型，这两门语言天生支持多核，但JavaScript不支持。</p>
+
+<p>Elixir和Go 分别用不同的方式实现了调度。Go 使用了协作式调度， 也就是说运行时代码必须交还控制权给调度器，以便其他操作轮流执行。Elixir使用抢占式调度，这种方式会为每个操作强制预设一个执行窗口。</p>
+
+<p>协作式调度在基准测试方面更高效， 抢占式调度会因为开始的强制执行而产生额外开销。但抢占式调度的的一致性更好，这能确保数以百万的小型操作不会因一个不放弃执行权限的大型操作所拖延。</p>
+
+<p>Go 程序员可以在代码中插入<code class="highlighter-rouge">runtime.Goshed()</code>， 强制调度器执行更多校验， 以作为应对潜在问题代码的预防措施。运行时强制性的允许相信更多第三方库和实时系统。</p>
+
+<h3 id="goroutines对比进程">Goroutines对比”进程”</h3>
+
+<p>在 Go 中通过goroutine执行并发。只需要简单的在方法前面加上go就可以了， 任何方法都可以这么做。如下：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>hello("Bob")
+// To...
+go hello("Bob")
+</code></pre></div></div>
+
+<p>Elixir 在这点上与 Go 非常相似。Go 用 go 创建 goroutine， Elixir 生成”进程”(spawn processes 这里的进程不是操作系统的进程)。另外请注意，函数必须在Elixir的模块里面。</p>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code># From...
+HelloModule.hello("Bob")
+# To...
+spawn(HelloModule, :hello, ["Bob"])
+# Or by passing a function
+spawn fn -&gt; HelloModule.hello("Bob") end
+</code></pre></div></div>
+
+<p>此处的最大区别是，<code class="highlighter-rouge">go</code> 不会返回任何东西，<code class="highlighter-rouge">spawn</code> 会返回进程的 ID。</p>
+
+<p>这两个系统都通过消息队列实现了例程间的通信。Go 称它为管道(channels）， Elixir 称它为进程邮箱(process mailboxes)。</p>
+
+<p>在 Go 中，可以先定义一个管道，如果引用了该管道，任何东西都可以通过管道传递消息。在 Elixir 中， 消息可以通过进程 ID 或进程名字给进程传递消息。Go 中的管道需要按消息的类型进行定义，而 Elixir 使用模式匹配处理消息邮箱。</p>
+
+<p>发消息给 Elixir 的进程相当于发消息给goroutine所监视管道。🌰：
+Go channel</p>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>messages := make(chan string) // Define a channel that accepts strings
+
+go func() { messages &lt;- "ping" }() // Send to messages
+
+msg := &lt;-messages // Listen for new messages
+fmt.Println(msg)
+</code></pre></div></div>
+<p>Elixir 进程邮箱</p>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>send self(), {:hello, "world"}
+receive do
+  {:hello, msg} -&gt; msg # This reciever will match the pattern
+  {:world, msg} -&gt; "won't match"
+end
+</code></pre></div></div>
+
+<p>两者可以在监听消息时设置超时。因为 Go 有共享内存，所以 goroutine 可以直接转化成内存引用，但需要互斥锁以避免竞争。理想情况下，一个 goroutine监听一个管道来更新内存， 就不需要互斥锁了。</p>
+
+<p>除了这个功能之外，事情还会扩张。</p>
+
+<p>在使用并发和分布式逻辑时，Erlang定义了一套捆绑在“OTP”下最佳实践模式。多数情况下，在 Elixir 的代码中，你永远都接触不到原生的<code class="highlighter-rouge">spawn</code> 和 <code class="highlighter-rouge">send/receive</code> 函数，这样就推迟了功能的抽象。</p>
+
+<p><code class="highlighter-rouge">Task</code> 的封装实现了简单的<code class="highlighter-rouge">async/await</code>风格的调用。<code class="highlighter-rouge">Agent</code>为并发的进程维护和更新共享状态。<code class="highlighter-rouge">GenServer</code> 可用来实现更复杂的自定义逻辑。</p>
+
+<p>为了限制一个特定的队列所能承受的最高并发，Go 管道实现了缓冲区用于接受指定数量的消息(用数量限制发送者)。默认情况下，如果还没准备好接受消息，管道一直是阻塞的，除非是设定了缓冲区。</p>
+
+<p>Elixir 进程邮箱默认没有消息处理数量限制，但可以使用<code class="highlighter-rouge">Task.async_stream</code>定义一个操作的最大并发数。这跟在 channel 上设置有限缓冲区以阻止发送者的方式是一样的。</p>
+
+<p>例程在这两门语言里的代价都十分小， 每个 goroutine 只有2K 的大小，而 Elixir 的每个进程只有0.5K。Elixir 的进程有自己独立的堆空间，当进程结束后会被单独回收。goroutine 使用共享内存，用一个应用范围内(application-wide)的垃圾回收器回收资源。</p>
+
+<h2 id="错误处理">错误处理</h2>
+<p>错误处理是这两门语言差别最大的地方。从函数调用到panics(Go 的崩溃异常), Go 对各个层次的错误处理都很明确。Elixir的错误处理被认为有种”代码的味道”。过会再来读一遍。</p>
+
+<p>它是如何工作的呢？是否还记得先前我们谈论过Elixir的<code class="highlighter-rouge">spawn</code>调用会返回一个进程ID？它不仅仅是用来发送消息的，还可以用来监控进程并检查它是否还在活动状态。</p>
+
+<p>由于进程的代价小，Elixir的标准做法是一次性创建两个，一个用来运行，一个用来监督。</p>
+
+<p>这种方法被成为管理者模式。Elixir的应用往往在一种监管树内运行。 监管者进程通过一个叫spawn_link的函数创建进程, 如果被创建进程崩溃，那么创建进程也会崩溃。监管者进会处理这些崩溃，并迅速重启进程。</p>
+
+<p><a href="https://github.com/kblake/simple-supervision">一个例子，用被监管的进程做除法运算</a>。被0除将进程崩溃掉，但监管进程会立即将其重启，让未来的操作得以继续执行。不是错误处理不存在，而是被监管进程处理掉了。</p>
+
+<p>正好相反，Go 没有办法追踪每个独立例程的执行。所以每个层次的错误处理都需要非常明确，这就会导致写出如下的代码：</p>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>b, err := base64.URLEncoding.DecodeString(cookie)
+if err != nil {
+  // Handle error
+}
+</code></pre></div></div>
+
+<p>这样做的目的是在可能出现异常的地方都要加上异常处理，不管是不是在goroutine 里。</p>
+
+<p>Goroutine 可以用相同的方式将错误传递给管道。然而，如果 panic 出现，每个 goroutine 必须有应对之策，不然整个程序都会崩溃掉。panic 不同于其他语言里的异常，它的目的是系统级别”停止任何事情”的事件。</p>
+
+<p>这种异常被封装在内存不足的错误里。如果 goroutine 触发了一个内存不足的错误，由于共享内存运行时的状态，即便是有对应的错误处理也会导致程序的崩溃。</p>
+
+<p>对于 Elixir， 由于每个进程都有自己独立的堆空间，也就可以各自设置堆的最大值，一旦超过这个最大值进程就会崩溃，然后会被单独做垃圾回收并重启，不会影响其他东西。</p>
+
+<p>这并不是说Elixir 是无敌的。VM 依然可以通过其他方式耗尽内存, 但在进程中该问题是可控的。</p>
+
+<p>并不是为了打击 Go， 所有你听说过的使用共享内存的语言都要面对该问题。这只是Erlang / Elixir设计上的一个特点。</p>
+
+<p>Go的处理方式迫使开发者在可能出现错误的地方直接进行处理，这需要明确的设计思路，但 这可能会开发出精心设计的应用程序。</p>
+
+<p>Elixir 的核心概念就像Joe Armstrong 所说的那样， 期望一个应用程序可以一直运行。就像用 Go 调用调度器，你也可以通过 Go 的 <a href="http://www.jerf.org/iri/post/2930">suture</a> 库实现一个监管程序。</p>
+
+<p>注： 你在大多数服务器上用 Go 实现的处理程序都已处理panic 错误。因此，一次 Web 请求出现的崩溃，不足以干掉一个进程。即便如此，你依然要在 goroutine 上解决它。这个解释不是为了暗示 Go 的脆弱，毕竟它也不是 :)</p>
+
+<h2 id="可变与不可变">可变与不可变</h2>
+<p>在 Go 与 Elixir 的比较中，理解可变类型与不可变类型数据对比所产生的权衡是十分重要的。</p>
+
+<p>Go 使用与大多数程序员所用过的相同的内存管理风格，通过共享内存、指针和数据结构 对内存进行更改或重新分配。在处理大的数据结构的时候，这种方式效率更高。</p>
+
+<p>Elixir的不可变数据使用了写入时拷贝。在相同的堆空间中，它实际上是传递一个指向数据的指针，但只要对其执行操作，就会创建一个新的副本。</p>
+
+<p>例如， 值列表会传递指向内存中不可数据的指针列表，而排序将以不同的顺序返回一个指针列表，因为内存中的值可以相信它是不变得。改变列表中的一个值就会返回一个新的列表，其中一个指针会指向新的值。如果要把这个列表传递给另一个进程，这个列表将会被复制一份到新的堆空间。</p>
+
+<h2 id="集群">集群</h2>
+<p>另一个出自可变与与不可变对比的权衡是集群化。使用 Go， 可以无缝的执行远程调用。但由于指针和共享内存的存在，如果你在远程的终端调用一个引用了本地参数的方法，这就不会像预期那样执行了。</p>
+
+<p>对于 Elixir，所有的东西都是通过消息传递的，所以整个应用程序栈可以在任意数量的机器上集群化。数据被传入返回响应的函数中。任何函数函数调用都不会发生内存中的转换，这就允许Elixir像其他函数调用它自己的堆堆栈一样，可以在不同的堆栈、不同的机器、或完全不同的数据中心。</p>
+
+<p>许多应用不需要集群化，但也有很多应用从中受益，例如用户从不同的机器连接的聊天程序或水平分布的数据库都会用到的通信系统。两者分别可以使用Phoenix 框架的管道和 Erlang 的 Mnesia数据库的解决方案。集群对于任何应用程序的横向扩展能力都是十分重要的，而不依赖于有性能瓶颈的中间节点。</p>
+
+<h2 id="库">库</h2>
+<p>Go 拥有一个广泛<a href="https://golang.org/pkg/">标准库</a>，允许大多数开发者在不需要第三库的情况多做任何事。</p>
+
+<p>Elixir<a href="https://hexdocs.pm/elixir/Kernel.html">标准库</a>更显得简洁一些，但也包含Erlang 的库，它的库更全面，还包括三个内置的数据库 ETS/DETS/Mnesia。其他的包，必须从其他的三方库中提取。</p>
+
+<p>Elixir 和 Go 都有大量的第三方库可以用。Go 使用<code class="highlighter-rouge">go get</code>引入远程的包。Elixir 使用 Mix， 一个构建工具，它会像用户所熟悉的其他语言的包管理方式调用Hex包。</p>
+
+<p>Go仍在努力实现一个完整的包管理方案。三方库与标准库相比，Go 社区的大多数人在可能的情况下更倾向于使用标准库。目前 已经有几个包管理工具可以用了。</p>
+
+<h2 id="部署">部署</h2>
+<p>Go 的部署很简单。一个 Go 应用程序被编程成一个包含所有依赖的二进制文件，可以在本地运行，也可以夸平台。Go 的编译器可以针对任何架构的框架进行编译，而不管运行的计算机是什么样的。这是 Go 最大的优势。</p>
+
+<p>Elixir 实际上有很多配置选项，但首选的方法还是通过优秀的distillery包。它将应用程序封装成一个包含所依赖(能在目标系统一并部署)二进制文件。</p>
+
+<p>两者的区别在于， Elixir 的编译所用的架构必须与目标系统的架构相同才行。这些文档(这里应该是 链接)包含了这个场景的几个解决方法，但最简单的方法是在具有目标架构的Docker容器中构建发行。</p>
+
+<p>使用这两种解决方案，都必须要停止正在运行的代码，替换二进制文件，然后按大多数 blue-green 风格的部署方式重启应用。</p>
+
+<h2 id="热更新">热更新</h2>
+<p>Elixir 还有另外一种部署方式，BEAM 虚拟机。稍微有点复杂，但有一些特定类型的应用适合这种方案。它叫做热加载或热更新。</p>
+
+<p>Distillery 使用<code class="highlighter-rouge">--upgrade</code>参数来简化你构建的命令，但这并不意味着你要一直用它。</p>
+
+<p>在谈论何时用它之前，我们需要先理解它是什么。
+Erlang是为电话系统而开发的，目前驱动了这个星球上一半的电话系统。它被设计成永远不会宕机, 但当系统中正在有人打电话时，部署就变成了一个复杂的问题。</p>
+
+<p>如何在不断开系统中所有人的情况下进行部署？是否要禁止新来的流量并礼貌的等待每个人到通话结束？</p>
+
+<p>答案是否定的，那正式需要热加载的地方。</p>
+
+<p>由于进程间堆栈的隔离，版本的升级是不会打断运行中的进程。没有激活的进程直接被替换，新部署的进程与运行中的进程同时存在并接受新的流量，运行中的进程可以一直工作直到任务完成。</p>
+
+<p>这可以使你部署具有数百万通话系统升级， 而且是不打断现有通话的前提下。想象一下，用一堆新的汽包替换天空中另一堆起泡，这基本上就是热加载的工作方式。老的起泡四处飘散，直到它们破裂。</p>
+
+<p>了解了这一点，就可以看到一些可能排的上用场的场景：</p>
+
+<ol>
+  <li>一个用户连接到指定机器的 websocket 聊天系统</li>
+  <li>一个作业服务器， 升级系统的时候不中断正在运行的作业</li>
+  <li>一个大流量的 CDN，正在连接一个很慢的WEB 请求</li>
+</ol>
+
+<p>尤其是 websocket， 在一个有数百万活动连接的机器上部署，不用因中断而承受瞬间的爆发式重连尝试，甚至丢失正在传输中的信息。顺便说一句，这就是为什么 Whatsapp 使用 Erlang。热加载被用来给正在飞行的飞机电脑进行更新。</p>
+
+<p>热更新的缺点是，如果需要回滚将会更复杂。你可能不需要用它，除非你有一个真正需要它的场景。有个选择总是好的。</p>
+
+<p>集群化也是如此，并不是一直需要它，但当你那么做的时候它是必不可少的。集群化、热更新与分布式系统齐头并进。</p>
+
+<h2 id="结论">结论</h2>
+<p>这篇文章很长，但希望它把Elixir 和 Go 之间的区别做一个详实的描述。思考这两门语言最有效的方式是吧Elixir 看做一个系统，而 Go 是一个专门的程序。</p>
+
+<p>Go 的快速和针对性的解决方案非常适合工程化。Elixir 创建一个环境，即使在部署的时候，不同的程序也可以共存，操作和交流，且互不干扰 。Go 可以用来构建单个微服务, 而一个 Elixir 的<a href="http://elixir-lang.org/getting-started/mix-otp/dependencies-and-umbrella-apps.html#umbrella-projects">umbrella</a>环境里可以构建多个微服务。</p>
+
+<p>Go 更专注且简单易用。一旦理解 了Elixir思想，它也很简单。如果你的目标是在使用它之前掌握它，那么 OTP 的世界和 Erlang 的广阔会让人感到恐惧。</p>
+
+<p>两者都是非常出色的语言，做任何编程的事情时，它们都是我的首选。</p>
+
+<p>对于非常集中的代码，可移植的系统级工具，性能密集型任务和API，Go很难被击败。对于全堆栈的Web应用程序，分布式系统，实时系统或嵌入式应用程序，我会选择Elixir。</p>
+
+<hr />
+
+<div class="footnotes">
+  <ol>
+    <li id="fn:tradeoff">
+      <p>这里的意思不是很明确 “but both have made some core tradeoffs that affect their potential use cases.” <a href="#fnref:tradeoff" class="reversefootnote">&#8617;</a></p>
+    </li>
+  </ol>
+</div>
